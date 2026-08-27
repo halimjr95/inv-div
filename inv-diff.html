@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<style>
+/* Jannah if installed locally, otherwise Cairo / Tajawal */
+@font-face{font-family:'Jannah';src:local('Jannah'),local('Jannah LT'),local('Jannah LT Regular'),local('JannahLT');font-weight:400;font-display:swap}
+@font-face{font-family:'Jannah';src:local('Jannah Bold'),local('Jannah LT Bold'),local('JannahLT-Bold');font-weight:700;font-display:swap}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --font:'Jannah','Cairo','Tajawal','Segoe UI',Tahoma,sans-serif;
+  --bg:#eef2f7;
+  --surface:#ffffff;
+  --surface-2:#f8fafc;
+  --text:#0f172a;
+  --muted:#64748b;
+  --border:#e2e8f0;
+  --border-strong:#cbd5e1;
+  --primary:#2563eb;
+  --primary-dark:#1d4ed8;
+  --primary-soft:#eff6ff;
+  --success:#16a34a;
+  --success-soft:#dcfce7;
+  --danger:#dc2626;
+  --danger-soft:#fee2e2;
+  --warning:#ea580c;
+  --warning-soft:#ffedd5;
+  --purple:#7c3aed;
+  --purple-soft:#f3e8ff;
+  --sidebar:#0b1220;
+  --sidebar-2:#111c30;
+  --sidebar-text:#94a3b8;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px -18px rgba(15,23,42,.45);
+  --sw:266px;
+  --sw-collapsed:78px;
+}
+
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased}
+
+/* ============ LAYOUT ============ */
+.app{display:flex;min-height:100vh}
+
+.sidebar{
+  width:var(--sw);flex-shrink:0;background:linear-gradient(180deg,var(--sidebar) 0%,var(--sidebar-2) 100%);
+  color:#e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+  transition:width .22s ease;z-index:40;overflow:hidden;
+}
+body.collapsed .sidebar{width:var(--sw-collapsed)}
+
+.brand{display:flex;align-items:center;gap:12px;padding:22px 20px;border-bottom:1px solid rgba(148,163,184,.14);min-height:78px}
+.brand-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;box-shadow:0 6px 16px -6px rgba(59,130,246,.9)}
+.brand-text{white-space:nowrap;overflow:hidden}
+.brand-text b{display:block;font-size:1.02rem;color:#fff;letter-spacing:.2px}
+.brand-text span{font-size:.74rem;color:var(--sidebar-text)}
+body.collapsed .brand-text{display:none}
+body.collapsed .brand{justify-content:center;padding:22px 10px}
+
+.nav{padding:16px 12px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto}
+.nav-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.11em;color:#475569;padding:10px 12px 4px;white-space:nowrap}
+body.collapsed .nav-label{opacity:0;height:0;padding:0}
+
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;cursor:pointer;
+  color:var(--sidebar-text);border:none;background:transparent;width:100%;text-align:left;
+  font-family:var(--font);font-size:.93rem;font-weight:500;transition:all .18s ease;position:relative;
+}
+.nav-item .ico{width:34px;height:34px;border-radius:9px;background:rgba(148,163,184,.10);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all .18s}
+.nav-item .txt{white-space:nowrap;overflow:hidden}
+.nav-item:hover{background:rgba(148,163,184,.10);color:#fff}
+.nav-item.active{background:linear-gradient(90deg,rgba(37,99,235,.30),rgba(37,99,235,.06));color:#fff}
+.nav-item.active .ico{background:var(--primary);box-shadow:0 6px 16px -6px rgba(37,99,235,.95)}
+.nav-item.active::before{content:'';position:absolute;left:-12px;top:9px;bottom:9px;width:4px;border-radius:0 4px 4px 0;background:#60a5fa}
+.nav-dot{width:8px;height:8px;border-radius:50%;background:#334155;margin-left:auto;flex-shrink:0}
+.nav-dot.on{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+body.collapsed .nav-item{justify-content:center;padding:11px 8px}
+body.collapsed .nav-item .txt,body.collapsed .nav-dot{display:none}
+
+.side-foot{padding:14px 12px;border-top:1px solid rgba(148,163,184,.14)}
+.collapse-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:11px;background:rgba(148,163,184,.08);color:var(--sidebar-text);border:none;cursor:pointer;font-family:var(--font);font-size:.88rem;font-weight:600}
+.collapse-btn:hover{background:rgba(148,163,184,.18);color:#fff}
+.collapse-btn .ico{width:22px;text-align:center;font-size:16px}
+body.collapsed .collapse-btn{justify-content:center}
+body.collapsed .collapse-btn .txt{display:none}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+.topbar{
+  background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 12px -6px rgba(15,23,42,.25);
+  padding:16px 30px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30;min-height:78px;
+}
+.topbar h1{font-size:1.28rem;font-weight:700;letter-spacing:-.01em}
+.topbar p{font-size:.85rem;color:var(--muted);margin-top:2px}
+.burger{display:none;background:var(--surface-2);border:1px solid var(--border);width:40px;height:40px;border-radius:10px;font-size:17px;cursor:pointer}
+.top-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+
+.content{padding:26px 30px 60px;flex:1}
+.panel{display:none;animation:fade .25s ease}
+.panel.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ============ CARDS ============ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:20px}
+.card-head{display:flex;align-items:center;gap:13px;margin-bottom:20px;flex-wrap:wrap}
+.step-num{width:32px;height:32px;border-radius:10px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+.card-head h2{font-size:1.05rem;font-weight:700}
+.card-head .sub{font-size:.83rem;color:var(--muted);font-weight:400;display:block;margin-top:1px}
+.card-head .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* ============ UPLOAD ============ */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+
+.drop{
+  display:block;border:2px dashed var(--border-strong);border-radius:12px;padding:26px 18px;text-align:center;
+  background:var(--surface-2);cursor:pointer;transition:all .2s ease
+}
+.drop:hover{border-color:var(--primary);background:var(--primary-soft)}
+.drop.filled{border-style:solid;border-color:var(--success);background:#f0fdf4}
+.drop .ic{font-size:30px;margin-bottom:8px}
+.drop .t{font-weight:700;color:var(--text);margin-bottom:3px}
+.drop .h{font-size:.83rem;color:var(--muted)}
+input[type=file]{display:none}
+.fileinfo{margin-top:12px;padding:11px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;font-size:.86rem;display:none}
+.fileinfo.show{display:block}
+.fileinfo b{color:var(--success)}
+
+/* ============ FORM ============ */
+.field{margin-bottom:0}
+.label{display:block;font-weight:700;font-size:.88rem;margin-bottom:7px;color:var(--text)}
+.label .hint{display:block;font-weight:400;font-size:.79rem;color:var(--muted);margin-top:2px}
+select,input[type=text],input[type=number]{
+  width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:10px;font-size:.92rem;
+  font-family:var(--font);background:#fff;color:var(--text);transition:all .16s
+}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+
+.picker{border:1px solid var(--border);border-radius:11px;background:var(--surface-2);padding:12px}
+.picker-tools{display:flex;gap:7px;margin-bottom:9px;flex-wrap:wrap}
+.chip{padding:5px 10px;font-size:.76rem;border-radius:7px;background:#fff;border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;font-family:var(--font);font-weight:600}
+.chip:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.checklist{max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px}
+.checklist label{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:.89rem;transition:background .14s}
+.checklist label:hover{background:var(--primary-soft)}
+.checklist input{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0}
+.tag{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--primary-soft);color:var(--primary);margin-left:auto;flex-shrink:0}
+.counter{font-size:.74rem;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--primary-soft);color:var(--primary)}
+
+/* ============ BUTTONS ============ */
+.btn{padding:11px 20px;border:1px solid transparent;border-radius:10px;font-weight:600;cursor:pointer;font-size:.92rem;font-family:var(--font);transition:all .18s;display:inline-flex;align-items:center;gap:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--primary-dark);transform:translateY(-1px);box-shadow:0 10px 20px -10px rgba(37,99,235,.9)}
+.btn-ghost{background:#fff;color:var(--muted);border-color:var(--border-strong)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover:not(:disabled){background:#15803d;transform:translateY(-1px)}
+.btn-purple{background:var(--purple);color:#fff}
+.btn-purple:hover{background:#6d28d9}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ============ STATS ============ */
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
+.stat .v{font-size:1.75rem;font-weight:700;color:var(--primary);line-height:1.2;word-break:break-word}
+.stat .v.sm{font-size:1.05rem}
+.stat .l{font-size:.81rem;color:var(--muted);margin-top:3px}
+.stat.green::before{background:var(--success)} .stat.green .v{color:var(--success)}
+.stat.red::before{background:var(--danger)} .stat.red .v{color:var(--danger)}
+.stat.orange::before{background:var(--warning)} .stat.orange .v{color:var(--warning)}
+.stat.purple::before{background:var(--purple)} .stat.purple .v{color:var(--purple)}
+
+/* ============ TABLE ============ */
+.tablewrap{overflow:auto;border:1px solid var(--border);border-radius:12px;max-height:640px}
+table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;font-size:.9rem}
+thead th{
+  position:sticky;top:0;z-index:5;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;
+  padding:13px 14px;text-align:left;font-weight:600;white-space:nowrap;border-bottom:1px solid #1e40af;font-size:.86rem
+}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:#1d4ed8}
+th .arw{opacity:.6;font-size:.72rem;margin-left:5px}
+td{padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr:hover td{background:var(--surface-2)}
+tfoot td{position:sticky;bottom:0;background:#f1f5f9;font-weight:700;border-top:2px solid var(--primary);z-index:4}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+.pos{color:var(--success);font-weight:700}
+.neg{color:var(--danger);font-weight:700}
+.zero{color:var(--muted)}
+.row-diff td{background:#fffbeb}
+.cell-green{background:var(--success-soft)!important;color:#15803d;font-weight:700}
+.cell-red{background:var(--danger-soft)!important;color:#b91c1c;font-weight:700}
+.cell-orange{background:var(--warning-soft)!important;color:#c2410c;font-weight:700}
+tr.row-green td{background:#eafbf0}
+tr.row-green:hover td{background:#dcfce7}
+tr.row-red td{background:#fef1f1}
+tr.row-red:hover td{background:#fee2e2}
+tr.row-orange td{background:#fff6ec}
+tr.row-orange:hover td{background:#ffedd5}
+.pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.74rem;font-weight:700}
+.pill.g{background:var(--success-soft);color:#15803d}
+.pill.r{background:var(--danger-soft);color:#b91c1c}
+.pill.o{background:var(--warning-soft);color:#c2410c}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:.84rem;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:6px;vertical-align:-2px}
+
+/* colour settings */
+.colorbar{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin-bottom:16px}
+.coloritem{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--surface-2);border-radius:11px;padding:9px 12px}
+.coloritem .nm{font-size:.84rem;font-weight:600}
+.coloritem .nm small{display:block;font-weight:400;color:var(--muted);font-size:.75rem}
+.coloritem input[type=color]{width:38px;height:32px;padding:2px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;cursor:pointer}
+.coloritem input[type=color]:disabled{opacity:.35;cursor:not-allowed}
+.coloritem label.off{display:flex;align-items:center;gap:5px;font-size:.76rem;color:var(--muted);cursor:pointer;white-space:nowrap}
+.coloritem label.off input{width:14px;height:14px;accent-color:var(--primary);cursor:pointer}
+
+tr[data-rc] td{background:var(--rc)!important}
+tbody tr[data-rc]:hover td{filter:brightness(.95)}
+
+.toolbar{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;align-items:end}
+
+.pager{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.pager .info{color:var(--muted);font-size:.85rem}
+
+.chartbox{position:relative;height:330px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:20px}
+
+.alert{padding:13px 16px;border-radius:11px;margin-bottom:16px;display:none;font-size:.9rem;border:1px solid transparent}
+.alert.show{display:block}
+.alert.error{background:var(--danger-soft);color:#991b1b;border-color:#fecaca}
+.alert.ok{background:var(--success-soft);color:#166534;border-color:#bbf7d0}
+.alert.warn{background:var(--warning-soft);color:#9a3412;border-color:#fed7aa}
+
+.hidden{display:none!important}
+.loading{display:none;text-align:center;padding:34px}
+.loading.show{display:block}
+.spin{width:38px;height:38px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sp .9s linear infinite;margin:0 auto 14px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:38px;color:var(--muted)}
+.empty .ic{font-size:38px;margin-bottom:10px}
+
+.mini-tbl{font-size:.85rem;max-height:230px}
+
+@media(max-width:1100px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .25s}
+  body.mobile-open .sidebar{transform:translateX(0)}
+  body.collapsed .sidebar{width:var(--sw)}
+  body.collapsed .brand-text,body.collapsed .nav-item .txt,body.collapsed .collapse-btn .txt,body.collapsed .nav-dot{display:block}
+  body.collapsed .nav-item{justify-content:flex-start;padding:11px 12px}
+  .burger{display:block}
+  .grid-2,.grid-4{grid-template-columns:1fr}
+  .content,.topbar{padding-left:18px;padding-right:18px}
+  .collapse-btn{display:none}
+}
+
+@media print{
+  .sidebar,.topbar,.toolbar,.actions,.pager,.drop,.fileinfo,.card-head .right{display:none!important}
+  body{background:#fff}
+  .card{box-shadow:none;border:none;padding:0}
+  .tablewrap{max-height:none;overflow:visible}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">📦</div>
+      <div class="brand-text"><b>Inventory Suite</b><span>Excel toolkit</span></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">Tools</div>
+
+      <button class="nav-item active" data-view="compare" onclick="showView('compare')" title="Inventory Comparison">
+        <span class="ico">🔍</span><span class="txt">Comparison</span><span class="nav-dot" id="dot-compare"></span>
+      </button>
+
+      <button class="nav-item" data-view="aggregate" onclick="showView('aggregate')" title="Quantity Aggregation">
+        <span class="ico">➕</span><span class="txt">Aggregation</span><span class="nav-dot" id="dot-aggregate"></span>
+      </button>
+
+      <button class="nav-item" data-view="distribute" onclick="showView('distribute')" title="Distribute Quantities">
+        <span class="ico">🎯</span><span class="txt">Distribute Qty</span><span class="nav-dot" id="dot-distribute"></span>
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <button class="collapse-btn" onclick="toggleSidebar()">
+        <span class="ico" id="collapse-ico">«</span><span class="txt">Collapse menu</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="burger" onclick="document.body.classList.toggle('mobile-open')">☰</button>
+      <div>
+        <h1 id="page-title">Inventory Comparison</h1>
+        <p id="page-sub">Compare two inventory files and detect the differences</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-ghost" onclick="window.print()">🖨️ Print</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ================= COMPARE ================= -->
+      <section class="panel active" id="view-compare">
+        <div class="alert" id="cmp-alert"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="step-num">1</span><div><h2>Upload the two files</h2><span class="sub">Excel or CSV — first sheet is used</span></div></div>
+          <div class="grid-2">
+            <div>
+              <label class="drop" for="file-before" id="drop-before">
+                <div class="ic">📁</div><div class="t">Before Inventory</div><div class="h">Drag the file here or click to browse</div>
+              </label>
+              <input type="file" id="file-before" accept=".xlsx,.xls,.csv">
+              <div class="fileinfo" id="info-before"></div>
+            </div>
+            <div>
+              <label class="drop" for="file-after" id="drop-after">
+                <div class="ic">📁</div><div class="t">After Inventory</div><div class="h">Drag the file here or click to browse</div>
+              </label>
+              <input type="file" id="file-after" accept=".xlsx,.xls,.csv">
+              <div class="fileinfo" id="info-after"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="cmp-config">
+          <div class="card-head"><span class="step-num">2</span><div><h2>Configure columns</h2><span class="sub">Pick the key columns and the quantity column in each file</span></div></div>
+          <div class="grid-2" style="margin-bottom:18px">
+            <div class="field"><label class="label">Group by — first file<span class="hint">One or more columns forming the key</span></label>
+              <div class="picker"><div class="checklist" id="group-cols-before"></div></div></div>
+            <div class="field"><label class="label">Group by — second file<span class="hint">Must match the same order</span></label>
+              <div class="picker"><div class="checklist" id="group-cols-after"></div></div></div>
+          </div>
+          <div class="grid-2" style="margin-bottom:18px">
+            <div class="field"><label class="label">Quantity column — first file</label><select id="qty-col-before"></select></div>
+            <div class="field"><label class="label">Quantity column — second file</label><select id="qty-col-after"></select></div>
+          </div>
+          <div class="grid-2" style="margin-bottom:20px">
+            <div class="field"><label class="label">Description — first file</label><select id="desc-col-before"></select></div>
+            <div class="field"><label class="label">Description — second file (fallback)</label><select id="desc-col-after"></select></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="processCompare()">⚙️ Process data</button>
+            <button class="btn btn-ghost" onclick="resetCompare()">Reset</button>
+          </div>
+        </div>
+
+        <div class="loading" id="cmp-loading"><div class="spin"></div><p>Processing data…</p></div>
+
+        <div class="hidden" id="cmp-results">
+          <div class="grid-4" style="margin-bottom:20px">
+            <div class="stat"><div class="v" id="cmp-total">0</div><div class="l">Total products</div></div>
+            <div class="stat orange"><div class="v" id="cmp-diff">0</div><div class="l">Products with differences</div></div>
+            <div class="stat green"><div class="v" id="cmp-inc">0</div><div class="l">Increased</div></div>
+            <div class="stat red"><div class="v" id="cmp-dec">0</div><div class="l">Decreased</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><span class="step-num">3</span><div><h2>Results &amp; differences</h2></div>
+              <div class="right">
+                <button class="btn btn-success" onclick="exportCompare()">⬇️ Export Excel</button>
+              </div>
+            </div>
+            <div class="chartbox"><canvas id="cmp-chart"></canvas></div>
+            <div class="toolbar">
+              <div><label class="label">Show</label>
+                <select id="cmp-filter" onchange="renderCompare()">
+                  <option value="all">All products</option>
+                  <option value="diff">With differences only</option>
+                  <option value="increased">Increased only</option>
+                  <option value="decreased">Decreased only</option>
+                </select></div>
+              <div><label class="label">Search</label><input type="text" id="cmp-search" placeholder="Code or description…" oninput="renderCompare()"></div>
+              <div><label class="label">Rows per page</label>
+                <select id="cmp-per" onchange="renderCompare()"><option>25</option><option selected>50</option><option>100</option><option value="999999">All</option></select></div>
+            </div>
+            <div class="tablewrap">
+              <table>
+                <thead><tr>
+                  <th>Code</th><th>Description</th><th class="num">Qty before</th><th class="num">Qty after</th><th class="num">Difference</th><th class="num">Change %</th>
+                </tr></thead>
+                <tbody id="cmp-tbody"></tbody>
+              </table>
+              <div class="empty hidden" id="cmp-empty"><div class="ic">📭</div><p>No results to display</p></div>
+            </div>
+            <div class="pager" id="cmp-pager"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= AGGREGATE ================= -->
+      <section class="panel" id="view-aggregate">
+        <div class="alert" id="agg-alert"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="step-num">1</span><div><h2>Upload the Excel file</h2><span class="sub">One file — you can pick the sheet after upload</span></div></div>
+          <label class="drop" for="agg-file" id="drop-agg">
+            <div class="ic">📗</div><div class="t">Select Excel / CSV file</div><div class="h">Drag it here or click to browse (.xlsx, .xls, .csv)</div>
+          </label>
+          <input type="file" id="agg-file" accept=".xlsx,.xls,.csv">
+          <div class="fileinfo" id="agg-info"></div>
+        </div>
+
+        <div class="card hidden" id="agg-config">
+          <div class="card-head"><span class="step-num">2</span><div><h2>Choose the columns</h2><span class="sub">Rows sharing the same key are merged into one row</span></div></div>
+          <div class="grid-2" style="margin-bottom:18px">
+            <div class="field">
+              <label class="label">Group by columns <span class="counter" id="agg-gcount">0 selected</span></label>
+              <div class="picker">
+                <div class="picker-tools">
+                  <button class="chip" onclick="checkAll('agg-gcols',true)">Select all</button>
+                  <button class="chip" onclick="checkAll('agg-gcols',false)">Clear</button>
+                </div>
+                <div class="checklist" id="agg-gcols"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Quantity columns to sum <span class="counter" id="agg-qcount">0 selected</span></label>
+              <div class="picker">
+                <div class="picker-tools">
+                  <button class="chip" onclick="checkAll('agg-qcols',true)">Select all</button>
+                  <button class="chip" onclick="checkAll('agg-qcols',false)">Clear</button>
+                  <button class="chip" onclick="checkNumeric('agg-qcols')">Numeric only</button>
+                </div>
+                <div class="checklist" id="agg-qcols"></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom:20px">
+            <div class="field"><label class="label">Sheet</label><select id="agg-sheet" onchange="loadAggSheet(this.value)"></select></div>
+            <div class="field"><label class="label">Decimal places</label>
+              <select id="agg-dec"><option value="0" selected>0 — whole numbers</option><option value="2">2</option><option value="3">3</option></select></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="processAgg()">⚙️ Aggregate quantities</button>
+            <button class="btn btn-ghost" onclick="resetAgg()">Reset</button>
+          </div>
+        </div>
+
+        <div class="loading" id="agg-loading"><div class="spin"></div><p>Aggregating…</p></div>
+
+        <div class="hidden" id="agg-results">
+          <div class="grid-4" style="margin-bottom:20px">
+            <div class="stat purple"><div class="v" id="agg-s-rows">0</div><div class="l">Rows read</div></div>
+            <div class="stat"><div class="v" id="agg-s-groups">0</div><div class="l">Groups produced</div></div>
+            <div class="stat green"><div class="v" id="agg-s-total">0</div><div class="l" id="agg-s-total-l">Total quantity</div></div>
+            <div class="stat orange"><div class="v sm" id="agg-s-top">-</div><div class="l">Largest group</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><span class="step-num">3</span><div><h2>Aggregation results</h2></div>
+              <div class="right"><button class="btn btn-success" onclick="exportAgg()">⬇️ Export Excel</button></div>
+            </div>
+            <div class="chartbox"><canvas id="agg-chart"></canvas></div>
+            <div class="toolbar">
+              <div><label class="label">Search</label><input type="text" id="agg-search" placeholder="Filter groups…" oninput="renderAgg()"></div>
+              <div><label class="label">Show</label>
+                <select id="agg-filter" onchange="renderAgg()">
+                  <option value="all">All groups</option><option value="nonzero">Non-zero only</option>
+                  <option value="zero">Zero only</option><option value="negative">Negative only</option>
+                </select></div>
+              <div><label class="label">Rows per page</label>
+                <select id="agg-per" onchange="renderAgg()"><option>25</option><option selected>50</option><option>100</option><option value="999999">All</option></select></div>
+            </div>
+            <div class="tablewrap">
+              <table><thead><tr id="agg-thead"></tr></thead><tbody id="agg-tbody"></tbody><tfoot id="agg-tfoot"></tfoot></table>
+              <div class="empty hidden" id="agg-empty"><div class="ic">📭</div><p>No groups match the filter</p></div>
+            </div>
+            <div class="pager" id="agg-pager"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= DISTRIBUTE ================= -->
+      <section class="panel" id="view-distribute">
+        <div class="alert" id="dst-alert"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="step-num">1</span><div><h2>Source file — aggregate it first</h2><span class="sub">The file holding the real quantities, summed per item code</span></div></div>
+          <label class="drop" for="dst-src-file" id="drop-dst-src">
+            <div class="ic">📗</div><div class="t">Select the source file</div><div class="h">Drag it here or click to browse</div>
+          </label>
+          <input type="file" id="dst-src-file" accept=".xlsx,.xls,.csv">
+          <div class="fileinfo" id="dst-src-info"></div>
+
+          <div class="hidden" id="dst-src-config" style="margin-top:18px">
+            <div class="grid-2" style="margin-bottom:18px">
+              <div class="field">
+                <label class="label">Group by (item code) <span class="counter" id="dst-gcount">0 selected</span><span class="hint">Usually a single item-code column</span></label>
+                <div class="picker">
+                  <div class="picker-tools">
+                    <button class="chip" onclick="checkAll('dst-gcols',false)">Clear</button>
+                  </div>
+                  <div class="checklist" id="dst-gcols"></div>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Quantity columns to sum <span class="counter" id="dst-qcount">0 selected</span></label>
+                <div class="picker">
+                  <div class="picker-tools">
+                    <button class="chip" onclick="checkAll('dst-qcols',false)">Clear</button>
+                    <button class="chip" onclick="checkNumeric('dst-qcols')">Numeric only</button>
+                  </div>
+                  <div class="checklist" id="dst-qcols"></div>
+                </div>
+              </div>
+            </div>
+            <div class="grid-2" style="margin-bottom:20px">
+              <div class="field"><label class="label">Sheet</label><select id="dst-src-sheet" onchange="loadDstSrcSheet(this.value)"></select></div>
+              <div class="field"><label class="label">Decimal places</label>
+                <select id="dst-dec"><option value="0" selected>0 — whole numbers</option><option value="2">2</option><option value="3">3</option></select></div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="aggregateSource()">⚙️ Aggregate source</button>
+              <button class="btn btn-ghost" onclick="resetDistribute()">Reset all</button>
+            </div>
+          </div>
+
+          <div class="hidden" id="dst-src-summary" style="margin-top:18px">
+            <div class="alert ok show" id="dst-src-msg"></div>
+            <div class="tablewrap mini-tbl">
+              <table><thead><tr id="dst-src-thead"></tr></thead><tbody id="dst-src-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="dst-tgt-card">
+          <div class="card-head"><span class="step-num">2</span><div><h2>Target file — the sequenced one</h2><span class="sub">Rows stay exactly as they are; the quantity lands on the first occurrence only</span></div></div>
+          <label class="drop" for="dst-tgt-file" id="drop-dst-tgt">
+            <div class="ic">📘</div><div class="t">Select the target file</div><div class="h">Drag it here or click to browse</div>
+          </label>
+          <input type="file" id="dst-tgt-file" accept=".xlsx,.xls,.csv">
+          <div class="fileinfo" id="dst-tgt-info"></div>
+
+          <div class="hidden" id="dst-tgt-config" style="margin-top:18px">
+            <div class="grid-2" style="margin-bottom:18px">
+              <div class="field"><label class="label">Sheet</label><select id="dst-tgt-sheet" onchange="loadDstTgtSheet(this.value)"></select></div>
+              <div class="field"><label class="label">Matching<span class="hint">Exact match — only outer spaces are trimmed</span></label>
+                <select id="dst-match" disabled><option>Exact match (case &amp; format sensitive)</option></select></div>
+            </div>
+            <div id="dst-keymap" class="grid-2" style="margin-bottom:20px"></div>
+            <div class="actions">
+              <button class="btn btn-primary" onclick="runDistribute()">🎯 Distribute quantities</button>
+              <button class="btn btn-ghost" onclick="resetDistribute()">Reset all</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="loading" id="dst-loading"><div class="spin"></div><p>Matching &amp; distributing…</p></div>
+
+        <div class="hidden" id="dst-results">
+          <div class="grid-4" style="margin-bottom:20px">
+            <div class="stat purple"><div class="v" id="dst-s-rows">0</div><div class="l">Target rows</div></div>
+            <div class="stat green"><div class="v" id="dst-s-first">0</div><div class="l">Rows carrying quantity</div></div>
+            <div class="stat red"><div class="v" id="dst-s-dup">0</div><div class="l">Duplicates set to zero</div></div>
+            <div class="stat orange"><div class="v" id="dst-s-nf">0</div><div class="l">Codes not found</div></div>
+          </div>
+
+          <div class="alert warn" id="dst-unused"></div>
+
+          <div class="card">
+            <div class="card-head"><span class="step-num">3</span><div><h2>Distribution result</h2><span class="sub">Same rows, same order, quantity placed once per code</span></div>
+              <div class="right"><button class="btn btn-success" onclick="exportDistribute()">⬇️ Export Excel</button></div>
+            </div>
+
+            <div class="colorbar" id="dst-colorbar">
+              <div class="coloritem">
+                <input type="color" id="c-first" value="#DCFCE7" oninput="onColorChange()">
+                <div class="nm">Carries the quantity<small>first occurrence of the code</small></div>
+                <label class="off"><input type="checkbox" id="off-first" onchange="onColorChange()"> no fill</label>
+              </div>
+              <div class="coloritem">
+                <input type="color" id="c-dup" value="#FEE2E2" oninput="onColorChange()">
+                <div class="nm">Duplicate — zero<small>code already used above</small></div>
+                <label class="off"><input type="checkbox" id="off-dup" onchange="onColorChange()"> no fill</label>
+              </div>
+              <div class="coloritem">
+                <input type="color" id="c-nf" value="#FFEDD5" oninput="onColorChange()">
+                <div class="nm">Not found<small>code missing from source</small></div>
+                <label class="off"><input type="checkbox" id="off-nf" onchange="onColorChange()"> no fill</label>
+              </div>
+              <div class="coloritem">
+                <button class="chip" onclick="resetColors()">↺ Default colours</button>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <div><label class="label">Search</label><input type="text" id="dst-search" placeholder="Search any column…" oninput="renderDst()"></div>
+              <div><label class="label">Show</label>
+                <select id="dst-filter" onchange="renderDst()">
+                  <option value="all">All rows</option>
+                  <option value="first">Rows with quantity</option>
+                  <option value="dup">Duplicates (zero)</option>
+                  <option value="nf">Not found</option>
+                </select></div>
+              <div><label class="label">Rows per page</label>
+                <select id="dst-per" onchange="renderDst()"><option>25</option><option selected>50</option><option>100</option><option value="999999">All</option></select></div>
+            </div>
+
+            <div class="tablewrap">
+              <table><thead><tr id="dst-thead"></tr></thead><tbody id="dst-tbody"></tbody><tfoot id="dst-tfoot"></tfoot></table>
+              <div class="empty hidden" id="dst-empty"><div class="ic">📭</div><p>No rows match the filter</p></div>
+            </div>
+            <div class="pager" id="dst-pager"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   SHARED HELPERS
+   ========================================================= */
+const VIEWS = {
+  compare:{title:'Inventory Comparison', sub:'Compare two inventory files and detect the differences'},
+  aggregate:{title:'Quantity Aggregation', sub:'Sum quantities from one Excel file grouped by any columns'},
+  distribute:{title:'Distribute Quantities', sub:'Aggregate a source file, then place each quantity on the first matching row of the target file'}
+};
+
+function showView(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelector('.nav-item[data-view="'+name+'"]').classList.add('active');
+  document.getElementById('page-title').textContent = VIEWS[name].title;
+  document.getElementById('page-sub').textContent = VIEWS[name].sub;
+  document.body.classList.remove('mobile-open');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function toggleSidebar(){
+  document.body.classList.toggle('collapsed');
+  document.getElementById('collapse-ico').textContent = document.body.classList.contains('collapsed')?'»':'«';
+}
+
+function setDot(view,on){ document.getElementById('dot-'+view).classList.toggle('on', !!on); }
+
+function esc(v){
+  return String(v===null||v===undefined?'':v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function toNum(v){
+  if(typeof v==='number') return isFinite(v)?v:0;
+  if(v===null||v===undefined) return 0;
+  let s=String(v).trim(); if(!s) return 0;
+  s=s.replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-0x0660)).replace(/[۰-۹]/g,d=>String(d.charCodeAt(0)-0x06f0));
+  s=s.replace(/[,٬\s]/g,'').replace(/[^\d.\-+eE]/g,'');
+  const n=parseFloat(s); return isNaN(n)?0:n;
+}
+
+function isNumLike(v){
+  if(typeof v==='number') return true;
+  if(v===null||v===undefined||String(v).trim()==='') return false;
+  return /^[\s+\-]?[\d٠-٩۰-۹.,٬]+\s*$/.test(String(v).trim());
+}
+
+function round(n,d){ const p=Math.pow(10,d); return Math.round((n+Number.EPSILON)*p)/p; }
+function fmt(n,d){ d=d===undefined?2:d; return round(n,d).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:d}); }
+
+function alertBox(id,msg,type){
+  const el=document.getElementById(id);
+  el.textContent=msg; el.className='alert show '+type;
+  if(type!=='warn') setTimeout(()=>el.classList.remove('show'),6000);
+}
+
+function checkAll(id,state){
+  document.querySelectorAll('#'+id+' input[type=checkbox]').forEach(c=>c.checked=state);
+  document.getElementById(id).dispatchEvent(new Event('change',{bubbles:true}));
+}
+function checkNumeric(id){
+  const numeric = document.getElementById(id).dataset.numeric ? JSON.parse(document.getElementById(id).dataset.numeric) : [];
+  document.querySelectorAll('#'+id+' input[type=checkbox]').forEach(c=>c.checked = numeric.indexOf(c.value)!==-1);
+  document.getElementById(id).dispatchEvent(new Event('change',{bubbles:true}));
+}
+
+function buildChecklist(id,columns,preselected,numericCols){
+  const box=document.getElementById(id);
+  box.innerHTML='';
+  box.dataset.numeric = JSON.stringify(numericCols||[]);
+  columns.forEach(col=>{
+    const l=document.createElement('label');
+    const i=document.createElement('input');
+    i.type='checkbox'; i.value=col;
+    if((preselected||[]).indexOf(col)!==-1) i.checked=true;
+    l.appendChild(i);
+    const s=document.createElement('span'); s.textContent=col; l.appendChild(s);
+    if((numericCols||[]).indexOf(col)!==-1){ const t=document.createElement('span'); t.className='tag'; t.textContent='123'; l.appendChild(t); }
+    box.appendChild(l);
+  });
+}
+function checked(id){ return Array.from(document.querySelectorAll('#'+id+' input:checked')).map(x=>x.value); }
+
+function fillSelect(id,columns,emptyLabel){
+  const s=document.getElementById(id); s.innerHTML='';
+  if(emptyLabel){ const o=document.createElement('option'); o.value=''; o.textContent=emptyLabel; s.appendChild(o); }
+  columns.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; s.appendChild(o); });
+}
+
+function dropZone(inputId,dropId,handler){
+  const input=document.getElementById(inputId), box=document.getElementById(dropId);
+  box.addEventListener('dragover',e=>{e.preventDefault();box.classList.add('filled');});
+  box.addEventListener('dragleave',()=>{if(!input.files.length)box.classList.remove('filled');});
+  box.addEventListener('drop',e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files[0]){ input.files=e.dataTransfer.files; input.dispatchEvent(new Event('change')); }
+  });
+  input.addEventListener('change',handler);
+}
+
+function readWorkbook(file,cb,errId){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{ cb(XLSX.read(new Uint8Array(e.target.result),{type:'array'})); }
+    catch(err){ alertBox(errId,'Error reading file: '+err.message,'error'); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function sheetRows(wb,name){ return XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:''}); }
+
+function columnsOf(rows){
+  const set=new Set();
+  rows.slice(0,300).forEach(r=>Object.keys(r).forEach(k=>set.add(k)));
+  return Array.from(set);
+}
+
+function numericColumnsOf(rows,cols){
+  const sample=rows.slice(0,120);
+  return cols.filter(c=>{
+    let filled=0,num=0;
+    sample.forEach(r=>{ const v=r[c]; if(v===''||v===null||v===undefined) return; filled++; if(isNumLike(v)) num++; });
+    return filled>0 && num/filled>=0.8;
+  });
+}
+
+function pager(containerId,total,page,perPage,onGo){
+  const box=document.getElementById(containerId);
+  const pages=Math.max(1,Math.ceil(total/perPage));
+  if(pages<=1){ box.innerHTML=''; return; }
+  box.innerHTML='';
+  const mk=(label,target,disabled)=>{
+    const b=document.createElement('button');
+    b.className='btn btn-ghost'; b.textContent=label; b.disabled=disabled;
+    b.onclick=()=>onGo(target); box.appendChild(b);
+  };
+  mk('« First',1,page===1); mk('‹ Prev',page-1,page===1);
+  const info=document.createElement('span'); info.className='info';
+  info.textContent='Page '+page+' of '+pages+' · '+total.toLocaleString('en-US')+' rows';
+  box.appendChild(info);
+  mk('Next ›',page+1,page===pages); mk('Last »',pages,page===pages);
+}
+
+/* =========================================================
+   STYLED EXCEL EXPORT (ExcelJS)
+   ========================================================= */
+const XLS={
+  headBg:'FF1E3A8A', headFont:'FFFFFFFF', border:'FFB6C2D2', zebra:'FFF7FAFC',
+  green:'FFD7F5DF', greenFont:'FF14532D',
+  red:'FFFBDDDD', redFont:'FF991B1B',
+  orange:'FFFFE6CC', orangeFont:'FF9A3412'
+};
+const THIN={style:'thin',color:{argb:XLS.border}};
+const BORDER_ALL={top:THIN,left:THIN,bottom:THIN,right:THIN};
+
+/* colour utilities -------------------------------------------------- */
+function hexToArgb(hex){ return 'FF'+hex.replace('#','').toUpperCase(); }
+
+function darkText(hex){
+  hex=hex.replace('#','');
+  let r=parseInt(hex.substr(0,2),16)/255, g=parseInt(hex.substr(2,2),16)/255, b=parseInt(hex.substr(4,2),16)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b); let h=0, s=0; const l=(mx+mn)/2;
+  if(mx!==mn){
+    const d=mx-mn;
+    s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r) h=((g-b)/d+(g<b?6:0));
+    else if(mx===g) h=((b-r)/d+2);
+    else h=((r-g)/d+4);
+    h/=6;
+  }
+  if((mx-mn)*255<14) return '#1F2937';   // near-grey fill → neutral dark ink
+  const L=0.26, S=Math.min(0.95,Math.max(0.45,s));
+  const q=L<0.5?L*(1+S):L+S-L*S, p=2*L-q;
+  const hue=(t)=>{ if(t<0)t+=1; if(t>1)t-=1;
+    if(t<1/6) return p+(q-p)*6*t;
+    if(t<1/2) return q;
+    if(t<2/3) return p+(q-p)*(2/3-t)*6;
+    return p; };
+  const R=Math.round(hue(h+1/3)*255), G=Math.round(hue(h)*255), B=Math.round(hue(h-1/3)*255);
+  return '#'+[R,G,B].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+function resolveStyleKey(key){
+  if(!key) return null;
+  if(key.charAt(0)==='#') return {bg:hexToArgb(key), fg:hexToArgb(darkText(key))};
+  const bg = key==='green'?XLS.green : key==='red'?XLS.red : key==='orange'?XLS.orange : null;
+  const fg = key==='green'?XLS.greenFont : key==='red'?XLS.redFont : key==='orange'?XLS.orangeFont : null;
+  return bg?{bg:bg,fg:fg}:null;
+}
+
+function addStyledSheet(wb,name,headers,rows,opts){
+  opts=opts||{};
+  const ws=wb.addWorksheet(name.substring(0,31),{views:[{state:'frozen',ySplit:1}]});
+  ws.addRow(headers);
+  rows.forEach(r=>ws.addRow(r));
+
+  const head=ws.getRow(1);
+  head.height=26;
+  head.eachCell(c=>{
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:XLS.headBg}};
+    c.font={bold:true,size:11,color:{argb:XLS.headFont}};
+    c.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+    c.border=BORDER_ALL;
+  });
+
+  const numeric=opts.numericCols||[];
+  const numFmt=opts.numFmt||'#,##0.00';
+
+  for(let r=2;r<=ws.rowCount;r++){
+    const row=ws.getRow(r); row.height=18;
+    for(let c=1;c<=headers.length;c++){
+      const cell=row.getCell(c);
+      cell.border=BORDER_ALL;
+      cell.font={size:10.5};
+      const isInt=(opts.intCols||[]).indexOf(c-1)!==-1;
+      cell.alignment={vertical:'middle',horizontal:(numeric.indexOf(c-1)!==-1||isInt)?'right':'left'};
+      if(isInt) cell.numFmt='#,##0';
+      else if(numeric.indexOf(c-1)!==-1) cell.numFmt=numFmt;
+      let painted=false;
+      let key=null;
+      if(opts.rowStyle) key=opts.rowStyle(r-2,rows[r-2]);
+      if(!key && opts.cellStyle) key=opts.cellStyle(r-2,c-1,rows[r-2]);
+      const st=resolveStyleKey(key);
+      if(st){
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:st.bg}};
+        cell.font={size:10.5,bold:(opts.boldCols?opts.boldCols.indexOf(c-1)!==-1:true),color:{argb:st.fg}};
+        painted=true;
+      }
+      if(!painted && opts.zebra && r%2===1){
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:XLS.zebra}};
+      }
+    }
+  }
+
+  if(opts.totalRow){
+    const tr=ws.addRow(opts.totalRow);
+    tr.height=22;
+    tr.eachCell(c=>{
+      c.font={bold:true,size:11};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEF7'}};
+      c.border={top:{style:'double',color:{argb:XLS.headBg}},left:THIN,bottom:THIN,right:THIN};
+    });
+    for(let c=1;c<=headers.length;c++){
+      if((opts.intCols||[]).indexOf(c-1)!==-1){ tr.getCell(c).numFmt='#,##0'; tr.getCell(c).alignment={horizontal:'right'}; }
+      else if(numeric.indexOf(c-1)!==-1){ tr.getCell(c).numFmt=numFmt; tr.getCell(c).alignment={horizontal:'right'}; }
+    }
+  }
+
+  ws.autoFilter={from:{row:1,column:1},to:{row:1,column:headers.length}};
+  ws.columns.forEach((col,i)=>{
+    let max=String(headers[i]===undefined?'':headers[i]).length;
+    rows.forEach(r=>{ const v=r[i]; const len=(v===null||v===undefined)?0:String(v).length; if(len>max) max=len; });
+    col.width=Math.min(46,Math.max(11,max+3));
+  });
+  return ws;
+}
+
+async function saveWorkbook(wb,fileName){
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+/* =========================================================
+   1) COMPARISON
+   ========================================================= */
+let cmpBefore=null,cmpAfter=null,cmpResults=[],cmpPage=1,cmpDec=0;
+
+dropZone('file-before','drop-before',onCompareFile);
+dropZone('file-after','drop-after',onCompareFile);
+
+function onCompareFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  readWorkbook(file,wb=>{
+    const rows=sheetRows(wb,wb.SheetNames[0]);
+    const isBefore = e.target.id==='file-before';
+    if(isBefore) cmpBefore=rows; else cmpAfter=rows;
+    const info=document.getElementById(isBefore?'info-before':'info-after');
+    info.innerHTML='<b>✓ '+esc(file.name)+'</b><br><small>'+rows.length.toLocaleString('en-US')+' rows · '+wb.SheetNames[0]+'</small>';
+    info.classList.add('show');
+    document.getElementById(isBefore?'drop-before':'drop-after').classList.add('filled');
+    if(cmpBefore&&cmpAfter) setupCompare();
+  },'cmp-alert');
+}
+
+function setupCompare(){
+  document.getElementById('cmp-config').classList.remove('hidden');
+  const cb=columnsOf(cmpBefore), ca=columnsOf(cmpAfter);
+  buildChecklist('group-cols-before',cb,[],numericColumnsOf(cmpBefore,cb));
+  buildChecklist('group-cols-after',ca,[],numericColumnsOf(cmpAfter,ca));
+  fillSelect('qty-col-before',cb); fillSelect('qty-col-after',ca);
+  fillSelect('desc-col-before',cb,'— No description —');
+  fillSelect('desc-col-after',ca,'— No description —');
+}
+
+function groupRows(rows,keys,qtyCol,descCol){
+  const map={};
+  rows.forEach(r=>{
+    const key=keys.map(k=>String(r[k]===undefined?'':r[k]).trim()).join('|||');
+    if(!map[key]) map[key]={qty:0,desc:descCol?(r[descCol]||''):''};
+    map[key].qty+=toNum(r[qtyCol]);
+    if(!map[key].desc&&descCol) map[key].desc=r[descCol]||'';
+  });
+  return map;
+}
+
+function processCompare(){
+  const gb=checked('group-cols-before'), ga=checked('group-cols-after');
+  const qb=document.getElementById('qty-col-before').value, qa=document.getElementById('qty-col-after').value;
+  const db=document.getElementById('desc-col-before').value, da=document.getElementById('desc-col-after').value;
+  if(!gb.length||!ga.length) return alertBox('cmp-alert','Select at least one group-by column in each file','error');
+  if(gb.length!==ga.length) return alertBox('cmp-alert','Both files must use the same number of group-by columns','error');
+  if(!qb||!qa) return alertBox('cmp-alert','Select the quantity column in each file','error');
+
+  document.getElementById('cmp-loading').classList.add('show');
+  setTimeout(()=>{
+    try{
+      const A=groupRows(cmpBefore,gb,qb,db), B=groupRows(cmpAfter,ga,qa,da);
+      const keys=new Set([...Object.keys(A),...Object.keys(B)]);
+      cmpResults=[];
+      keys.forEach(k=>{
+        const qb2=A[k]?A[k].qty:0, qa2=B[k]?B[k].qty:0, diff=qa2-qb2;
+        cmpResults.push({
+          code:k.split('|||').join(' / '),
+          desc:(A[k]&&A[k].desc)||(B[k]&&B[k].desc)||'',
+          before:round(qb2,2), after:round(qa2,2), diff:round(diff,2),
+          pct: qb2!==0 ? round(diff/qb2*100,2) : 0
+        });
+      });
+      cmpResults.sort((x,y)=>Math.abs(y.diff)-Math.abs(x.diff));
+      cmpDec = cmpResults.some(r=>r.before%1!==0||r.after%1!==0) ? 2 : 0;
+
+      const withDiff=cmpResults.filter(r=>r.diff!==0).length;
+      document.getElementById('cmp-total').textContent=cmpResults.length.toLocaleString('en-US');
+      document.getElementById('cmp-diff').textContent=withDiff.toLocaleString('en-US');
+      document.getElementById('cmp-inc').textContent=cmpResults.filter(r=>r.diff>0).length.toLocaleString('en-US');
+      document.getElementById('cmp-dec').textContent=cmpResults.filter(r=>r.diff<0).length.toLocaleString('en-US');
+
+      cmpPage=1; renderCompare(); drawCmpChart(cmpResults.length-withDiff,
+        cmpResults.filter(r=>r.diff>0).length, cmpResults.filter(r=>r.diff<0).length);
+      document.getElementById('cmp-results').classList.remove('hidden');
+      setDot('compare',true);
+    }catch(err){ alertBox('cmp-alert','Error: '+err.message,'error'); }
+    document.getElementById('cmp-loading').classList.remove('show');
+  },60);
+}
+
+function cmpFiltered(){
+  const f=document.getElementById('cmp-filter').value;
+  const q=(document.getElementById('cmp-search').value||'').trim().toLowerCase();
+  let rows=cmpResults;
+  if(f==='diff') rows=rows.filter(r=>r.diff!==0);
+  else if(f==='increased') rows=rows.filter(r=>r.diff>0);
+  else if(f==='decreased') rows=rows.filter(r=>r.diff<0);
+  if(q) rows=rows.filter(r=>(r.code+' '+r.desc).toLowerCase().includes(q));
+  return rows;
+}
+
+function renderCompare(page){
+  const rows=cmpFiltered();
+  const per=parseInt(document.getElementById('cmp-per').value,10);
+  if(page) cmpPage=page; if((cmpPage-1)*per>=rows.length) cmpPage=1;
+  const tb=document.getElementById('cmp-tbody');
+  document.getElementById('cmp-empty').classList.toggle('hidden',rows.length>0);
+  tb.innerHTML='';
+  rows.slice((cmpPage-1)*per,(cmpPage-1)*per+per).forEach(r=>{
+    const cls=r.diff===0?'zero':(r.diff>0?'pos':'neg');
+    const tr=document.createElement('tr');
+    if(r.diff!==0) tr.className='row-diff';
+    tr.innerHTML='<td>'+esc(r.code)+'</td><td>'+esc(r.desc||'-')+'</td>'+
+      '<td class="num">'+fmt(r.before,cmpDec)+'</td><td class="num">'+fmt(r.after,cmpDec)+'</td>'+
+      '<td class="num '+cls+'">'+(r.diff>0?'+':'')+fmt(r.diff,cmpDec)+'</td>'+
+      '<td class="num '+cls+'">'+(r.diff===0?'0':(r.diff>0?'+':'')+r.pct+'%')+'</td>';
+    tb.appendChild(tr);
+  });
+  pager('cmp-pager',rows.length,cmpPage,per,p=>renderCompare(p));
+}
+
+function drawCmpChart(same,inc,dec){
+  const ctx=document.getElementById('cmp-chart').getContext('2d');
+  if(window.cmpChart) window.cmpChart.destroy();
+  window.cmpChart=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:['No change','Increased','Decreased'],
+      datasets:[{data:[same,inc,dec],backgroundColor:['#94a3b8','#16a34a','#dc2626'],borderColor:'#fff',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:12,family:"'Jannah','Cairo',sans-serif"}}},
+      title:{display:true,text:'Difference breakdown',font:{size:14,family:"'Jannah','Cairo',sans-serif"}}}}
+  });
+}
+
+async function exportCompare(){
+  if(!cmpResults.length) return alertBox('cmp-alert','Nothing to export yet','error');
+  const rows=cmpFiltered().map(r=>[r.code,r.desc||'-',r.before,r.after,r.diff,r.pct/100]);
+  const wb=new ExcelJS.Workbook(); wb.creator='Inventory Suite';
+  const headers=['Code','Description','Qty before','Qty after','Difference','Change %'];
+  const ws=addStyledSheet(wb,'Comparison',headers,rows,{
+    numericCols:[2,3,4,5], numFmt:cmpDec===0?'#,##0':'#,##0.'+'0'.repeat(cmpDec), zebra:true,
+    cellStyle:(ri,ci)=>{
+      if(ci!==4&&ci!==5) return null;
+      const d=rows[ri][4];
+      return d>0?'green':(d<0?'red':null);
+    },
+    totalRow:['TOTAL','',rows.reduce((a,r)=>a+r[2],0),rows.reduce((a,r)=>a+r[3],0),rows.reduce((a,r)=>a+r[4],0),'']
+  });
+  ws.getColumn(6).numFmt='0.00%';
+  await saveWorkbook(wb,'inventory_comparison.xlsx');
+}
+
+function resetCompare(){
+  cmpBefore=cmpAfter=null; cmpResults=[];
+  ['file-before','file-after'].forEach(id=>document.getElementById(id).value='');
+  ['info-before','info-after'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  ['drop-before','drop-after'].forEach(id=>document.getElementById(id).classList.remove('filled'));
+  document.getElementById('cmp-config').classList.add('hidden');
+  document.getElementById('cmp-results').classList.add('hidden');
+  setDot('compare',false);
+}
+
+/* =========================================================
+   2) AGGREGATION
+   ========================================================= */
+let aggWb=null,aggRows=null,aggName='',aggCols=[],aggNum=[],aggOut=[],aggG=[],aggQ=[],aggDec=2,aggPage=1;
+let aggSort={i:null,dir:'desc'};
+
+dropZone('agg-file','drop-agg',onAggFile);
+document.getElementById('agg-gcols').addEventListener('change',aggCounts);
+document.getElementById('agg-qcols').addEventListener('change',aggCounts);
+
+function aggCounts(){
+  document.getElementById('agg-gcount').textContent=checked('agg-gcols').length+' selected';
+  document.getElementById('agg-qcount').textContent=checked('agg-qcols').length+' selected';
+}
+
+function onAggFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  aggName=file.name;
+  readWorkbook(file,wb=>{
+    aggWb=wb;
+    fillSelect('agg-sheet',wb.SheetNames);
+    document.getElementById('agg-config').classList.remove('hidden');
+    document.getElementById('drop-agg').classList.add('filled');
+    loadAggSheet(wb.SheetNames[0]);
+  },'agg-alert');
+}
+
+function loadAggSheet(name){
+  aggRows=sheetRows(aggWb,name);
+  if(!aggRows.length){ alertBox('agg-alert','Sheet "'+name+'" has no rows','error'); return; }
+  aggCols=columnsOf(aggRows); aggNum=numericColumnsOf(aggRows,aggCols);
+  buildChecklist('agg-gcols',aggCols,[],aggNum);
+  buildChecklist('agg-qcols',aggCols,aggNum,aggNum);
+  const info=document.getElementById('agg-info');
+  info.innerHTML='<b>✓ '+esc(aggName)+'</b><br><small>Sheet: '+esc(name)+' · '+aggRows.length.toLocaleString('en-US')+' rows · '+aggCols.length+' columns</small>';
+  info.classList.add('show');
+  document.getElementById('agg-results').classList.add('hidden');
+  aggCounts();
+}
+
+function processAgg(){
+  aggG=checked('agg-gcols'); aggQ=checked('agg-qcols'); aggDec=parseInt(document.getElementById('agg-dec').value,10);
+  if(!aggRows||!aggRows.length) return alertBox('agg-alert','Upload a file first','error');
+  if(!aggG.length) return alertBox('agg-alert','Select at least one group-by column','error');
+  if(!aggQ.length) return alertBox('agg-alert','Select at least one quantity column','error');
+
+  document.getElementById('agg-loading').classList.add('show');
+  setTimeout(()=>{
+    try{
+      const map=new Map();
+      aggRows.forEach(r=>{
+        const vals=aggG.map(c=>String(r[c]===undefined?'':r[c]).trim());
+        const key=vals.join('|||');
+        let e=map.get(key);
+        if(!e){ e={vals:vals,sums:aggQ.map(()=>0),count:0}; map.set(key,e); }
+        aggQ.forEach((c,i)=>e.sums[i]+=toNum(r[c]));
+        e.count++;
+      });
+      aggOut=Array.from(map.values());
+      aggSort={i:aggG.length,dir:'desc'}; sortAgg();
+
+      const total=aggOut.reduce((a,r)=>a+r.sums[0],0);
+      let top=null; aggOut.forEach(r=>{ if(!top||r.sums[0]>top.sums[0]) top=r; });
+      document.getElementById('agg-s-rows').textContent=aggRows.length.toLocaleString('en-US');
+      document.getElementById('agg-s-groups').textContent=aggOut.length.toLocaleString('en-US');
+      document.getElementById('agg-s-total').textContent=fmt(total,aggDec);
+      document.getElementById('agg-s-total-l').textContent='Total of "'+aggQ[0]+'"';
+      document.getElementById('agg-s-top').textContent=top?(top.vals.join(' / ')||'-')+' = '+fmt(top.sums[0],aggDec):'-';
+
+      aggHeader(); aggPage=1; renderAgg(); drawAggChart();
+      document.getElementById('agg-results').classList.remove('hidden');
+      setDot('aggregate',true);
+      alertBox('agg-alert','Done — '+aggOut.length+' groups from '+aggRows.length+' rows','ok');
+    }catch(err){ alertBox('agg-alert','Error: '+err.message,'error'); }
+    document.getElementById('agg-loading').classList.remove('show');
+  },60);
+}
+
+function aggCell(r,i){
+  if(i<aggG.length) return r.vals[i];
+  if(i<aggG.length+aggQ.length) return r.sums[i-aggG.length];
+  return r.count;
+}
+function sortAgg(){
+  if(aggSort.i===null) return;
+  const dir=aggSort.dir==='asc'?1:-1, text=aggSort.i<aggG.length;
+  aggOut.sort((a,b)=>{
+    const x=aggCell(a,aggSort.i), y=aggCell(b,aggSort.i);
+    return text?String(x).localeCompare(String(y),undefined,{numeric:true})*dir:(x-y)*dir;
+  });
+}
+function aggSortBy(i){
+  if(aggSort.i===i) aggSort.dir=aggSort.dir==='asc'?'desc':'asc';
+  else { aggSort.i=i; aggSort.dir=i<aggG.length?'asc':'desc'; }
+  sortAgg(); aggHeader(); aggPage=1; renderAgg();
+}
+function aggHeader(){
+  const tr=document.getElementById('agg-thead'); tr.innerHTML='';
+  aggG.concat(aggQ.map(c=>'Σ '+c)).concat(['Rows']).forEach((h,i)=>{
+    const th=document.createElement('th');
+    th.className='sortable'+(i>=aggG.length?' num':'');
+    th.onclick=()=>aggSortBy(i);
+    th.textContent=h;
+    const a=document.createElement('span'); a.className='arw';
+    a.textContent=aggSort.i===i?(aggSort.dir==='asc'?'▲':'▼'):'⇅';
+    th.appendChild(a); tr.appendChild(th);
+  });
+}
+function aggFiltered(){
+  const q=(document.getElementById('agg-search').value||'').trim().toLowerCase();
+  const f=document.getElementById('agg-filter').value;
+  let rows=aggOut;
+  if(f==='nonzero') rows=rows.filter(r=>r.sums[0]!==0);
+  else if(f==='zero') rows=rows.filter(r=>r.sums[0]===0);
+  else if(f==='negative') rows=rows.filter(r=>r.sums[0]<0);
+  if(q) rows=rows.filter(r=>r.vals.join(' ').toLowerCase().includes(q));
+  return rows;
+}
+function renderAgg(page){
+  const rows=aggFiltered(), per=parseInt(document.getElementById('agg-per').value,10);
+  if(page) aggPage=page; if((aggPage-1)*per>=rows.length) aggPage=1;
+  const tb=document.getElementById('agg-tbody'), tf=document.getElementById('agg-tfoot');
+  document.getElementById('agg-empty').classList.toggle('hidden',rows.length>0);
+  tb.innerHTML='';
+  rows.slice((aggPage-1)*per,(aggPage-1)*per+per).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=r.vals.map(v=>'<td>'+esc(v||'-')+'</td>').join('')+
+      r.sums.map(s=>'<td class="num '+(s<0?'neg':(s===0?'zero':''))+'">'+fmt(s,aggDec)+'</td>').join('')+
+      '<td class="num">'+r.count+'</td>';
+    tb.appendChild(tr);
+  });
+  if(rows.length){
+    const totals=aggQ.map((c,i)=>rows.reduce((a,r)=>a+r.sums[i],0));
+    tf.innerHTML='<tr><td colspan="'+aggG.length+'">TOTAL · '+rows.length.toLocaleString('en-US')+' groups</td>'+
+      totals.map(t=>'<td class="num">'+fmt(t,aggDec)+'</td>').join('')+
+      '<td class="num">'+rows.reduce((a,r)=>a+r.count,0)+'</td></tr>';
+  } else tf.innerHTML='';
+  pager('agg-pager',rows.length,aggPage,per,p=>renderAgg(p));
+}
+function drawAggChart(){
+  const ctx=document.getElementById('agg-chart').getContext('2d');
+  if(window.aggChart) window.aggChart.destroy();
+  const top=aggOut.slice().sort((a,b)=>b.sums[0]-a.sums[0]).slice(0,10);
+  window.aggChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:top.map(r=>{const l=r.vals.join(' / ')||'-';return l.length>26?l.slice(0,26)+'…':l;}),
+      datasets:[{label:'Total '+aggQ[0],data:top.map(r=>r.sums[0]),backgroundColor:'rgba(37,99,235,.85)',borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},title:{display:true,text:'Top 10 groups by '+aggQ[0],font:{size:14,family:"'Jannah','Cairo',sans-serif"}}},
+      scales:{x:{grid:{color:'#e2e8f0'}},y:{grid:{display:false}}}}
+  });
+}
+async function exportAgg(){
+  if(!aggOut.length) return alertBox('agg-alert','Nothing to export yet','error');
+  const rows=aggFiltered().map(r=>r.vals.concat(r.sums.map(s=>round(s,aggDec))).concat([r.count]));
+  const headers=aggG.concat(aggQ.map(c=>'Total '+c)).concat(['Rows']);
+  const numeric=[]; for(let i=aggG.length;i<headers.length-1;i++) numeric.push(i);
+  const totals=aggG.map((_,i)=>i===0?'TOTAL':'').concat(aggQ.map((c,i)=>round(rows.reduce((a,r)=>a+r[aggG.length+i],0),aggDec)))
+    .concat([rows.reduce((a,r)=>a+r[headers.length-1],0)]);
+  const wb=new ExcelJS.Workbook(); wb.creator='Inventory Suite';
+  addStyledSheet(wb,'Aggregation',headers,rows,{
+    numericCols:numeric, intCols:[headers.length-1], numFmt:aggDec===0?'#,##0':'#,##0.'+'0'.repeat(aggDec), zebra:true, totalRow:totals
+  });
+  await saveWorkbook(wb,'quantity_aggregation.xlsx');
+}
+function resetAgg(){
+  aggWb=aggRows=null; aggOut=[];
+  document.getElementById('agg-file').value='';
+  document.getElementById('agg-info').classList.remove('show');
+  document.getElementById('drop-agg').classList.remove('filled');
+  document.getElementById('agg-config').classList.add('hidden');
+  document.getElementById('agg-results').classList.add('hidden');
+  if(window.aggChart){window.aggChart.destroy();window.aggChart=null;}
+  setDot('aggregate',false);
+}
+
+/* =========================================================
+   3) DISTRIBUTE QUANTITIES
+   ========================================================= */
+let dsWb=null,dsRows=null,dsName='',dsCols=[],dsNum=[];      // source file
+let dtWb=null,dtRows=null,dtName='',dtCols=[],dtSheet='';    // target file
+let dsMap=null,dsG=[],dsQ=[],dsDec=0;                        // aggregated source
+let dstOut=[],dstPage=1,dstUnused=[];
+
+/* row colours — user configurable, null = no fill */
+const DST_DEFAULTS={first:'#DCFCE7',dup:'#FEE2E2',nf:'#FFEDD5'};
+let dstColors={first:'#DCFCE7',dup:'#FEE2E2',nf:'#FFEDD5'};
+
+function readColors(){
+  ['first','dup','nf'].forEach(k=>{
+    const off=document.getElementById('off-'+k).checked;
+    document.getElementById('c-'+k).disabled=off;
+    dstColors[k]= off ? null : document.getElementById('c-'+k).value.toUpperCase();
+  });
+}
+function onColorChange(){ readColors(); if(dstOut.length) renderDst(dstPage); }
+function resetColors(){
+  ['first','dup','nf'].forEach(k=>{
+    document.getElementById('c-'+k).value=DST_DEFAULTS[k];
+    document.getElementById('off-'+k).checked=false;
+  });
+  onColorChange();
+}
+
+dropZone('dst-src-file','drop-dst-src',onDstSrcFile);
+dropZone('dst-tgt-file','drop-dst-tgt',onDstTgtFile);
+document.getElementById('dst-gcols').addEventListener('change',dstCounts);
+document.getElementById('dst-qcols').addEventListener('change',dstCounts);
+
+function dstCounts(){
+  document.getElementById('dst-gcount').textContent=checked('dst-gcols').length+' selected';
+  document.getElementById('dst-qcount').textContent=checked('dst-qcols').length+' selected';
+}
+
+function onDstSrcFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  dsName=file.name;
+  readWorkbook(file,wb=>{
+    dsWb=wb; fillSelect('dst-src-sheet',wb.SheetNames);
+    document.getElementById('dst-src-config').classList.remove('hidden');
+    document.getElementById('drop-dst-src').classList.add('filled');
+    loadDstSrcSheet(wb.SheetNames[0]);
+  },'dst-alert');
+}
+
+function loadDstSrcSheet(name){
+  dsRows=sheetRows(dsWb,name);
+  if(!dsRows.length){ alertBox('dst-alert','Sheet "'+name+'" has no rows','error'); return; }
+  dsCols=columnsOf(dsRows); dsNum=numericColumnsOf(dsRows,dsCols);
+  buildChecklist('dst-gcols',dsCols,[],dsNum);
+  buildChecklist('dst-qcols',dsCols,dsNum.slice(0,1),dsNum);
+  const info=document.getElementById('dst-src-info');
+  info.innerHTML='<b>✓ '+esc(dsName)+'</b><br><small>Sheet: '+esc(name)+' · '+dsRows.length.toLocaleString('en-US')+' rows · '+dsCols.length+' columns</small>';
+  info.classList.add('show');
+  document.getElementById('dst-src-summary').classList.add('hidden');
+  document.getElementById('dst-tgt-card').classList.add('hidden');
+  document.getElementById('dst-results').classList.add('hidden');
+  dstCounts();
+}
+
+function aggregateSource(){
+  dsG=checked('dst-gcols'); dsQ=checked('dst-qcols'); dsDec=parseInt(document.getElementById('dst-dec').value,10);
+  if(!dsRows||!dsRows.length) return alertBox('dst-alert','Upload the source file first','error');
+  if(!dsG.length) return alertBox('dst-alert','Select the item-code column(s) to group by','error');
+  if(!dsQ.length) return alertBox('dst-alert','Select at least one quantity column','error');
+
+  const map=new Map();
+  dsRows.forEach(r=>{
+    const vals=dsG.map(c=>String(r[c]===undefined?'':r[c]).trim());
+    const key=vals.join('|||');
+    let e=map.get(key);
+    if(!e){ e={vals:vals,sums:dsQ.map(()=>0),count:0,used:false}; map.set(key,e); }
+    dsQ.forEach((c,i)=>e.sums[i]+=toNum(r[c]));
+    e.count++;
+  });
+  dsMap=map;
+
+  const list=Array.from(map.values()).sort((a,b)=>b.sums[0]-a.sums[0]);
+  const total=list.reduce((a,r)=>a+r.sums[0],0);
+  document.getElementById('dst-src-msg').textContent=
+    '✓ Aggregated '+dsRows.length.toLocaleString('en-US')+' rows into '+list.length.toLocaleString('en-US')+
+    ' unique codes · total '+dsQ[0]+' = '+fmt(total,dsDec);
+
+  const th=document.getElementById('dst-src-thead');
+  th.innerHTML=dsG.map(c=>'<th>'+esc(c)+'</th>').join('')+dsQ.map(c=>'<th class="num">Σ '+esc(c)+'</th>').join('')+'<th class="num">Rows</th>';
+  const tb=document.getElementById('dst-src-tbody'); tb.innerHTML='';
+  list.slice(0,8).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=r.vals.map(v=>'<td>'+esc(v||'-')+'</td>').join('')+
+      r.sums.map(s=>'<td class="num">'+fmt(s,dsDec)+'</td>').join('')+'<td class="num">'+r.count+'</td>';
+    tb.appendChild(tr);
+  });
+  if(list.length>8){
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="'+(dsG.length+dsQ.length+1)+'" style="color:var(--muted)">… and '+(list.length-8).toLocaleString('en-US')+' more codes</td>';
+    tb.appendChild(tr);
+  }
+
+  document.getElementById('dst-src-summary').classList.remove('hidden');
+  document.getElementById('dst-tgt-card').classList.remove('hidden');
+  document.getElementById('dst-tgt-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function onDstTgtFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  dtName=file.name;
+  readWorkbook(file,wb=>{
+    dtWb=wb; fillSelect('dst-tgt-sheet',wb.SheetNames);
+    document.getElementById('dst-tgt-config').classList.remove('hidden');
+    document.getElementById('drop-dst-tgt').classList.add('filled');
+    loadDstTgtSheet(wb.SheetNames[0]);
+  },'dst-alert');
+}
+
+function loadDstTgtSheet(name){
+  dtSheet=name;
+  dtRows=sheetRows(dtWb,name);
+  if(!dtRows.length){ alertBox('dst-alert','Sheet "'+name+'" has no rows','error'); return; }
+  dtCols=columnsOf(dtRows);
+  const info=document.getElementById('dst-tgt-info');
+  info.innerHTML='<b>✓ '+esc(dtName)+'</b><br><small>Sheet: '+esc(name)+' · '+dtRows.length.toLocaleString('en-US')+' rows · '+dtCols.length+' columns</small>';
+  info.classList.add('show');
+
+  const box=document.getElementById('dst-keymap'); box.innerHTML='';
+  dsG.forEach((srcCol,i)=>{
+    const wrap=document.createElement('div'); wrap.className='field';
+    const lab=document.createElement('label'); lab.className='label';
+    lab.innerHTML='Match "'+esc(srcCol)+'" with<span class="hint">Column in the target file holding the same code</span>';
+    const sel=document.createElement('select'); sel.id='dst-key-'+i;
+    dtCols.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+    const exact=dtCols.indexOf(srcCol);
+    if(exact!==-1) sel.value=srcCol;
+    else{
+      const loose=dtCols.find(c=>c.toLowerCase().replace(/\s/g,'')===srcCol.toLowerCase().replace(/\s/g,''));
+      if(loose) sel.value=loose;
+    }
+    wrap.appendChild(lab); wrap.appendChild(sel); box.appendChild(wrap);
+  });
+  document.getElementById('dst-results').classList.add('hidden');
+}
+
+function runDistribute(){
+  if(!dsMap) return alertBox('dst-alert','Aggregate the source file first','error');
+  if(!dtRows||!dtRows.length) return alertBox('dst-alert','Upload the target file first','error');
+  const keyCols=dsG.map((_,i)=>document.getElementById('dst-key-'+i).value);
+  if(keyCols.some(c=>!c)) return alertBox('dst-alert','Pick the matching column for every key','error');
+
+  document.getElementById('dst-loading').classList.add('show');
+  setTimeout(()=>{
+    try{
+      dsMap.forEach(v=>v.used=false);
+      const seen=new Set();
+      dstOut=dtRows.map((row,idx)=>{
+        const key=keyCols.map(c=>String(row[c]===undefined?'':row[c]).trim()).join('|||');
+        const blank=key.split('|||').every(v=>v==='');
+        const src=blank?null:dsMap.get(key);
+        let status,qty;
+        if(!src){ status='nf'; qty=dsQ.map(()=>0); }
+        else if(seen.has(key)){ status='dup'; qty=dsQ.map(()=>0); }
+        else{ status='first'; qty=src.sums.map(s=>round(s,dsDec)); seen.add(key); src.used=true; }
+        return {i:idx,row:row,key:key,status:status,qty:qty};
+      });
+
+      dstUnused=[];
+      dsMap.forEach(v=>{ if(!v.used) dstUnused.push(v); });
+
+      const first=dstOut.filter(r=>r.status==='first').length;
+      const dup=dstOut.filter(r=>r.status==='dup').length;
+      const nf=dstOut.filter(r=>r.status==='nf').length;
+      document.getElementById('dst-s-rows').textContent=dstOut.length.toLocaleString('en-US');
+      document.getElementById('dst-s-first').textContent=first.toLocaleString('en-US');
+      document.getElementById('dst-s-dup').textContent=dup.toLocaleString('en-US');
+      document.getElementById('dst-s-nf').textContent=nf.toLocaleString('en-US');
+
+      const warn=document.getElementById('dst-unused');
+      if(dstUnused.length){
+        const missed=dstUnused.reduce((a,r)=>a+r.sums[0],0);
+        warn.textContent='⚠️ '+dstUnused.length.toLocaleString('en-US')+' code(s) from the source file were never found in the target file (total '+
+          dsQ[0]+' = '+fmt(missed,dsDec)+'). They are listed in a separate sheet in the exported Excel.';
+        warn.classList.add('show');
+      } else warn.classList.remove('show');
+
+      readColors(); dstHeader(); dstPage=1; renderDst();
+      document.getElementById('dst-results').classList.remove('hidden');
+      setDot('distribute',true);
+      alertBox('dst-alert','Done — quantity placed on '+first.toLocaleString('en-US')+' rows','ok');
+    }catch(err){ alertBox('dst-alert','Error: '+err.message,'error'); }
+    document.getElementById('dst-loading').classList.remove('show');
+  },60);
+}
+
+function dstHeader(){
+  const tr=document.getElementById('dst-thead');
+  tr.innerHTML='<th>#</th>'+dtCols.map(c=>'<th>'+esc(c)+'</th>').join('')+
+    dsQ.map(c=>'<th class="num">'+esc(c)+'</th>').join('')+'<th>Status</th>';
+}
+
+function dstFiltered(){
+  const q=(document.getElementById('dst-search').value||'').trim().toLowerCase();
+  const f=document.getElementById('dst-filter').value;
+  let rows=dstOut;
+  if(f!=='all') rows=rows.filter(r=>r.status===f);
+  if(q) rows=rows.filter(r=>dtCols.map(c=>r.row[c]).join(' ').toLowerCase().includes(q));
+  return rows;
+}
+
+function renderDst(page){
+  const rows=dstFiltered(), per=parseInt(document.getElementById('dst-per').value,10);
+  if(page) dstPage=page; if((dstPage-1)*per>=rows.length) dstPage=1;
+  const tb=document.getElementById('dst-tbody'), tf=document.getElementById('dst-tfoot');
+  document.getElementById('dst-empty').classList.toggle('hidden',rows.length>0);
+  tb.innerHTML='';
+  rows.slice((dstPage-1)*per,(dstPage-1)*per+per).forEach(r=>{
+    const color=dstColors[r.status];
+    const ink=color?darkText(color):null;
+    const label=r.status==='first'?'Qty':(r.status==='dup'?'Duplicate':'Not found');
+    const style=color?' style="background:'+color+';color:'+ink+'"':'';
+    const pill=color
+      ? '<span class="pill" style="background:'+color+';color:'+ink+'">'+label+'</span>'
+      : '<span class="pill" style="background:var(--light);color:var(--muted)">'+label+'</span>';
+    const tr=document.createElement('tr');
+    if(color) tr.setAttribute('data-rc',r.status), tr.style.setProperty('--rc',color);
+    tr.innerHTML='<td class="zero">'+(r.i+1)+'</td>'+
+      dtCols.map(c=>'<td>'+esc(r.row[c])+'</td>').join('')+
+      r.qty.map(q=>'<td class="num" style="font-weight:700'+(ink?';color:'+ink:'')+'">'+fmt(q,dsDec)+'</td>').join('')+
+      '<td>'+pill+'</td>';
+    tb.appendChild(tr);
+  });
+  if(rows.length){
+    const totals=dsQ.map((c,i)=>rows.reduce((a,r)=>a+r.qty[i],0));
+    tf.innerHTML='<tr><td colspan="'+(dtCols.length+1)+'">TOTAL · '+rows.length.toLocaleString('en-US')+' rows</td>'+
+      totals.map(t=>'<td class="num">'+fmt(t,dsDec)+'</td>').join('')+'<td></td></tr>';
+  } else tf.innerHTML='';
+  pager('dst-pager',rows.length,dstPage,per,p=>renderDst(p));
+}
+
+async function exportDistribute(){
+  if(!dstOut.length) return alertBox('dst-alert','Nothing to export yet','error');
+  const rows=dstFiltered();
+  const headers=dtCols.concat(dsQ.map(c=>c)).concat(['Status']);
+  const data=rows.map(r=>dtCols.map(c=>r.row[c])
+    .concat(r.qty.map(q=>round(q,dsDec)))
+    .concat([r.status==='first'?'Qty':(r.status==='dup'?'Duplicate':'Not found')]));
+
+  const qtyStart=dtCols.length;
+  const numeric=[]; for(let i=qtyStart;i<qtyStart+dsQ.length;i++) numeric.push(i);
+  const totals=dtCols.map((_,i)=>i===0?'TOTAL':'')
+    .concat(dsQ.map((c,i)=>round(rows.reduce((a,r)=>a+r.qty[i],0),dsDec))).concat(['']);
+
+  const wb=new ExcelJS.Workbook(); wb.creator='Inventory Suite';
+  addStyledSheet(wb,'Distribution',headers,data,{
+    numericCols:numeric,
+    numFmt: dsDec===0?'#,##0':'#,##0.'+'0'.repeat(dsDec),
+    totalRow:totals,
+    boldCols:numeric.concat([headers.length-1]),
+    rowStyle:(ri)=>dstColors[rows[ri].status]
+  });
+
+  if(dstUnused.length){
+    const uHeaders=dsG.concat(dsQ.map(c=>'Total '+c)).concat(['Source rows']);
+    const uRows=dstUnused.map(r=>r.vals.concat(r.sums.map(s=>round(s,dsDec))).concat([r.count]));
+    const uNum=[]; for(let i=dsG.length;i<uHeaders.length-1;i++) uNum.push(i);
+    addStyledSheet(wb,'Codes not in target',uHeaders,uRows,{
+      numericCols:uNum, intCols:[uHeaders.length-1], numFmt:dsDec===0?'#,##0':'#,##0.'+'0'.repeat(dsDec),
+      boldCols:uNum, rowStyle:()=>dstColors.nf
+    });
+  }
+
+  await saveWorkbook(wb,'distributed_quantities.xlsx');
+}
+
+function resetDistribute(){
+  dsWb=dsRows=dtWb=dtRows=dsMap=null; dstOut=[]; dstUnused=[];
+  ['dst-src-file','dst-tgt-file'].forEach(id=>document.getElementById(id).value='');
+  ['dst-src-info','dst-tgt-info'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  ['drop-dst-src','drop-dst-tgt'].forEach(id=>document.getElementById(id).classList.remove('filled'));
+  ['dst-src-config','dst-src-summary','dst-tgt-card','dst-tgt-config','dst-results'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('dst-unused').classList.remove('show');
+  setDot('distribute',false);
+}
+</script>
+</body>
+</html>
