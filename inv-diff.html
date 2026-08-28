@@ -300,6 +300,10 @@ tbody tr[data-rc]:hover td{filter:brightness(.95)}
       <button class="nav-item" data-view="distribute" onclick="showView('distribute')" title="Distribute Quantities">
         <span class="ico">🎯</span><span class="txt">Distribute Qty</span><span class="nav-dot" id="dot-distribute"></span>
       </button>
+
+      <button class="nav-item" data-view="merge" onclick="showView('merge')" title="Merge Files">
+        <span class="ico">🧩</span><span class="txt">Merge Files</span><span class="nav-dot" id="dot-merge"></span>
+      </button>
     </nav>
 
     <div class="side-foot">
@@ -631,6 +635,68 @@ tbody tr[data-rc]:hover td{filter:brightness(.95)}
         </div>
       </section>
 
+      <!-- ================= MERGE ================= -->
+      <section class="panel" id="view-merge">
+        <div class="alert" id="mrg-alert"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="step-num">1</span><div><h2>Pick the files</h2><span class="sub">Select them all at once, or drop them here — you can add more later</span></div></div>
+          <label class="drop" for="mrg-files" id="drop-mrg">
+            <div class="ic">🧩</div><div class="t">Select Excel / CSV files</div><div class="h">Multiple selection is allowed (.xlsx, .xls, .csv) — first sheet of each file is used</div>
+          </label>
+          <input type="file" id="mrg-files" accept=".xlsx,.xls,.csv" multiple>
+
+          <div class="hidden" id="mrg-filelist-wrap" style="margin-top:16px">
+            <div class="tablewrap mini-tbl">
+              <table>
+                <thead><tr><th>#</th><th>File</th><th>Sheet</th><th class="num">Rows</th><th class="num">Columns</th><th>Header</th><th></th></tr></thead>
+                <tbody id="mrg-filelist"></tbody>
+              </table>
+            </div>
+            <div class="alert warn" id="mrg-mismatch" style="margin-top:14px"></div>
+            <div class="actions" style="margin-top:16px">
+              <button class="btn btn-primary" onclick="runMerge()">🧩 Merge files</button>
+              <button class="btn btn-ghost" onclick="resetMerge()">Clear all</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="loading" id="mrg-loading"><div class="spin"></div><p>Merging…</p></div>
+
+        <div class="hidden" id="mrg-results">
+          <div class="grid-4" style="margin-bottom:20px">
+            <div class="stat purple"><div class="v" id="mrg-s-files">0</div><div class="l">Files merged</div></div>
+            <div class="stat"><div class="v" id="mrg-s-rows">0</div><div class="l">Total rows</div></div>
+            <div class="stat green"><div class="v" id="mrg-s-cols">0</div><div class="l">Columns in output</div></div>
+            <div class="stat orange"><div class="v sm" id="mrg-s-big">-</div><div class="l">Largest file</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><span class="step-num">2</span><div><h2>Merged result</h2><span class="sub">Rows keep their original order, file after file</span></div>
+              <div class="right"><button class="btn btn-success" onclick="exportMerge()">⬇️ Export Excel</button></div>
+            </div>
+
+            <div class="toolbar">
+              <div><label class="label">Search</label><input type="text" id="mrg-search" placeholder="Search any column…" oninput="renderMerge()"></div>
+              <div><label class="label">Source file</label><select id="mrg-filter" onchange="renderMerge()"><option value="">All files</option></select></div>
+              <div><label class="label">Rows per page</label>
+                <select id="mrg-per" onchange="renderMerge()"><option>25</option><option selected>50</option><option>100</option><option value="999999">All</option></select></div>
+              <div><label class="label">Options</label>
+                <label class="off" style="display:flex;align-items:center;gap:7px;font-size:.85rem;cursor:pointer;padding:9px 0">
+                  <input type="checkbox" id="mrg-srccol" checked onchange="renderMerge()" style="width:16px;height:16px;accent-color:var(--primary)">
+                  add "Source File" column
+                </label></div>
+            </div>
+
+            <div class="tablewrap">
+              <table><thead><tr id="mrg-thead"></tr></thead><tbody id="mrg-tbody"></tbody></table>
+              <div class="empty hidden" id="mrg-empty"><div class="ic">📭</div><p>No rows match the filter</p></div>
+            </div>
+            <div class="pager" id="mrg-pager"></div>
+          </div>
+        </div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -642,7 +708,8 @@ tbody tr[data-rc]:hover td{filter:brightness(.95)}
 const VIEWS = {
   compare:{title:'Inventory Comparison', sub:'Compare two inventory files and detect the differences'},
   aggregate:{title:'Quantity Aggregation', sub:'Sum quantities from one Excel file grouped by any columns'},
-  distribute:{title:'Distribute Quantities', sub:'Aggregate a source file, then place each quantity on the first matching row of the target file'}
+  distribute:{title:'Distribute Quantities', sub:'Aggregate a source file, then place each quantity on the first matching row of the target file'},
+  merge:{title:'Merge Files', sub:'Stack several Excel files that share the same header into one file'}
 };
 
 function showView(name){
@@ -1507,6 +1574,188 @@ async function exportDistribute(){
   }
 
   await saveWorkbook(wb,'distributed_quantities.xlsx');
+}
+
+/* =========================================================
+   4) MERGE FILES
+   ========================================================= */
+let mrgFiles=[];        // {name, sheet, sheetNames, wb, rows, cols}
+let mrgCols=[];         // union of columns, in first-seen order
+let mrgRows=[];         // {src, row}
+let mrgPage=1;
+
+document.getElementById('mrg-files').addEventListener('change',onMergeFiles);
+(function(){
+  const box=document.getElementById('drop-mrg'), input=document.getElementById('mrg-files');
+  box.addEventListener('dragover',e=>{e.preventDefault();box.classList.add('filled');});
+  box.addEventListener('dragleave',()=>box.classList.remove('filled'));
+  box.addEventListener('drop',e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files.length){ input.files=e.dataTransfer.files; input.dispatchEvent(new Event('change')); }
+  });
+})();
+
+function onMergeFiles(e){
+  const files=Array.from(e.target.files||[]);
+  if(!files.length) return;
+  let pending=files.length;
+  files.forEach(file=>{
+    readWorkbook(file,wb=>{
+      const sheet=wb.SheetNames[0];
+      const rows=sheetRows(wb,sheet);
+      mrgFiles.push({name:file.name,sheet:sheet,sheetNames:wb.SheetNames,wb:wb,rows:rows,cols:columnsOf(rows)});
+      if(--pending===0) afterMergeLoad();
+    },'mrg-alert');
+  });
+  e.target.value='';
+}
+
+function afterMergeLoad(){
+  document.getElementById('drop-mrg').classList.add('filled');
+  document.getElementById('mrg-filelist-wrap').classList.remove('hidden');
+  renderMergeFileList();
+}
+
+function changeMergeSheet(i,sheet){
+  const f=mrgFiles[i];
+  f.sheet=sheet; f.rows=sheetRows(f.wb,sheet); f.cols=columnsOf(f.rows);
+  renderMergeFileList();
+}
+
+function removeMergeFile(i){
+  mrgFiles.splice(i,1);
+  if(!mrgFiles.length) return resetMerge();
+  renderMergeFileList();
+}
+
+function renderMergeFileList(){
+  const base=mrgFiles.length?mrgFiles[0].cols:[];
+  const tb=document.getElementById('mrg-filelist'); tb.innerHTML='';
+  const problems=[];
+
+  mrgFiles.forEach((f,i)=>{
+    const missing=base.filter(c=>f.cols.indexOf(c)===-1);
+    const extra=f.cols.filter(c=>base.indexOf(c)===-1);
+    const same=!missing.length && !extra.length;
+    if(!same && i>0) problems.push({name:f.name,missing:missing,extra:extra});
+
+    const opts=f.sheetNames.map(s=>'<option'+(s===f.sheet?' selected':'')+'>'+esc(s)+'</option>').join('');
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td class="zero">'+(i+1)+'</td>'+
+      '<td><b>'+esc(f.name)+'</b></td>'+
+      '<td><select onchange="changeMergeSheet('+i+',this.value)" style="padding:5px 8px;font-size:.82rem">'+opts+'</select></td>'+
+      '<td class="num">'+f.rows.length.toLocaleString('en-US')+'</td>'+
+      '<td class="num">'+f.cols.length+'</td>'+
+      '<td>'+(i===0?'<span class="pill g">reference</span>':(same?'<span class="pill g">identical</span>':'<span class="pill o">different</span>'))+'</td>'+
+      '<td><button class="chip" onclick="removeMergeFile('+i+')">✕ remove</button></td>';
+    tb.appendChild(tr);
+  });
+
+  const warn=document.getElementById('mrg-mismatch');
+  if(problems.length){
+    warn.innerHTML='⚠️ '+problems.length+' file(s) do not have exactly the same header as the first file. '+
+      'All columns will still be merged — missing cells stay empty:<br>'+
+      problems.map(p=>'• <b>'+esc(p.name)+'</b>'+
+        (p.missing.length?' — missing: '+p.missing.map(esc).join(', '):'')+
+        (p.extra.length?' — extra: '+p.extra.map(esc).join(', '):'')).join('<br>');
+    warn.classList.add('show');
+  } else warn.classList.remove('show');
+}
+
+function runMerge(){
+  if(!mrgFiles.length) return alertBox('mrg-alert','Add at least one file','error');
+  document.getElementById('mrg-loading').classList.add('show');
+  setTimeout(()=>{
+    try{
+      mrgCols=[];
+      mrgFiles.forEach(f=>f.cols.forEach(c=>{ if(mrgCols.indexOf(c)===-1) mrgCols.push(c); }));
+      mrgRows=[];
+      mrgFiles.forEach(f=>f.rows.forEach(r=>mrgRows.push({src:f.name,row:r})));
+
+      const sel=document.getElementById('mrg-filter');
+      sel.innerHTML='<option value="">All files</option>';
+      mrgFiles.forEach(f=>{ const o=document.createElement('option'); o.value=f.name; o.textContent=f.name; sel.appendChild(o); });
+
+      let big=mrgFiles[0];
+      mrgFiles.forEach(f=>{ if(f.rows.length>big.rows.length) big=f; });
+      document.getElementById('mrg-s-files').textContent=mrgFiles.length;
+      document.getElementById('mrg-s-rows').textContent=mrgRows.length.toLocaleString('en-US');
+      document.getElementById('mrg-s-cols').textContent=mrgCols.length;
+      document.getElementById('mrg-s-big').textContent=big.name+' ('+big.rows.length.toLocaleString('en-US')+')';
+
+      mergeHeader(); mrgPage=1; renderMerge();
+      document.getElementById('mrg-results').classList.remove('hidden');
+      setDot('merge',true);
+      alertBox('mrg-alert','Done — '+mrgRows.length.toLocaleString('en-US')+' rows from '+mrgFiles.length+' files','ok');
+    }catch(err){ alertBox('mrg-alert','Error: '+err.message,'error'); }
+    document.getElementById('mrg-loading').classList.remove('show');
+  },60);
+}
+
+function mergeHeader(){
+  const withSrc=document.getElementById('mrg-srccol').checked;
+  document.getElementById('mrg-thead').innerHTML='<th>#</th>'+
+    (withSrc?'<th>Source File</th>':'')+
+    mrgCols.map(c=>'<th>'+esc(c)+'</th>').join('');
+}
+
+function mergeFiltered(){
+  const q=(document.getElementById('mrg-search').value||'').trim().toLowerCase();
+  const f=document.getElementById('mrg-filter').value;
+  let rows=mrgRows;
+  if(f) rows=rows.filter(r=>r.src===f);
+  if(q) rows=rows.filter(r=>mrgCols.map(c=>r.row[c]).join(' ').toLowerCase().includes(q));
+  return rows;
+}
+
+function renderMerge(page){
+  if(!mrgRows.length) return;
+  mergeHeader();
+  const withSrc=document.getElementById('mrg-srccol').checked;
+  const rows=mergeFiltered(), per=parseInt(document.getElementById('mrg-per').value,10);
+  if(page) mrgPage=page; if((mrgPage-1)*per>=rows.length) mrgPage=1;
+  const tb=document.getElementById('mrg-tbody');
+  document.getElementById('mrg-empty').classList.toggle('hidden',rows.length>0);
+  tb.innerHTML='';
+  rows.slice((mrgPage-1)*per,(mrgPage-1)*per+per).forEach((r,idx)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td class="zero">'+((mrgPage-1)*per+idx+1)+'</td>'+
+      (withSrc?'<td style="color:var(--muted)">'+esc(r.src)+'</td>':'')+
+      mrgCols.map(c=>'<td>'+esc(r.row[c]===undefined?'':r.row[c])+'</td>').join('');
+    tb.appendChild(tr);
+  });
+  pager('mrg-pager',rows.length,mrgPage,per,p=>renderMerge(p));
+}
+
+async function exportMerge(){
+  if(!mrgRows.length) return alertBox('mrg-alert','Nothing to export yet','error');
+  const withSrc=document.getElementById('mrg-srccol').checked;
+  const rows=mergeFiltered();
+  const headers=(withSrc?['Source File']:[]).concat(mrgCols);
+  const data=rows.map(r=>(withSrc?[r.src]:[]).concat(mrgCols.map(c=>{
+    const v=r.row[c];
+    return v===undefined?'':v;
+  })));
+
+  const wb=new ExcelJS.Workbook(); wb.creator='Inventory Suite';
+  addStyledSheet(wb,'Merged',headers,data,{zebra:true});
+
+  const sHeaders=['Source File','Sheet','Rows','Columns'];
+  const sRows=mrgFiles.map(f=>[f.name,f.sheet,f.rows.length,f.cols.length]);
+  sRows.push(['TOTAL','',mrgRows.length,mrgCols.length]);
+  addStyledSheet(wb,'Files',sHeaders,sRows,{intCols:[2,3],zebra:true});
+
+  await saveWorkbook(wb,'merged_files.xlsx');
+}
+
+function resetMerge(){
+  mrgFiles=[]; mrgRows=[]; mrgCols=[];
+  document.getElementById('mrg-files').value='';
+  document.getElementById('drop-mrg').classList.remove('filled');
+  document.getElementById('mrg-filelist-wrap').classList.add('hidden');
+  document.getElementById('mrg-results').classList.add('hidden');
+  document.getElementById('mrg-mismatch').classList.remove('show');
+  setDot('merge',false);
 }
 
 function resetDistribute(){
